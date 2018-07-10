@@ -1,51 +1,145 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: myapp
+  name: catalog
   labels:
-    app: myapp
+    app: catalog
 spec:
   ports:
     - port: 80
   selector:
-    app: myapp
+    app: catalog
+    tier: frontend
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout
+  labels:
+    app: checkout
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: checkout
+    tier: frontend
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: admin
+  labels:
+    app: admin
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: admin
     tier: frontend
   type: LoadBalancer
 ---
 apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
 kind: Deployment
 metadata:
-  name: myapp
+  name: catalog
   labels:
-    app: myapp
+    app: catalog
 spec:
   replicas: 1 
   selector:
     matchLabels:
-      app: myapp
+      app: catalog
       tier: frontend
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: myapp
+        app: catalog
         tier: frontend
     spec:
       containers:
-      - image: akril/magento:empty
-        name: myapp
+      - image: akril/magento-catalog:v1
+        name: catalog
         ports:
         - containerPort: 80
-          name: myapp
+          name: catalog
         volumeMounts:
         - name: host-mount
           mountPath: /app/src/magento2ce
         imagePullPolicy: Never
-#        lifecycle:
-#          postStart:
-#            exec:
-#              command: ["/bin/sh", "-c", "/app/bin/magento setup:install --backend-frontname=admin --db-host=172.17.0.7 --db-name=magento --db-user=root --db-password=password --admin-firstname=Anton --admin-lastname=Kril --admin-email=akril@magento.com --admin-user=admin --admin-password=123123q"]
+      volumes:
+      - name: host-mount
+        hostPath:
+          path: /synced
+---
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: checkout
+  labels:
+    app: checkout
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: checkout
+      tier: frontend
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: checkout
+        tier: frontend
+    spec:
+      containers:
+      - image: akril/magento-checkout:v1
+        name: checkout
+        ports:
+        - containerPort: 80
+          name: checkout
+        volumeMounts:
+        - name: host-mount
+          mountPath: /app/src/magento2ce
+        imagePullPolicy: Never
+      volumes:
+      - name: host-mount
+        hostPath:
+          path: /synced
+---
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: admin
+  labels:
+    app: admin
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: admin
+      tier: frontend
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: admin
+        tier: frontend
+    spec:
+      containers:
+      - image: akril/magento-admin:v1
+        name: admin
+        ports:
+        - containerPort: 80
+          name: admin
+        volumeMounts:
+        - name: host-mount
+          mountPath: /app/src/magento2ce
+        imagePullPolicy: Never
       volumes:
       - name: host-mount
         hostPath:
@@ -105,3 +199,55 @@ spec:
       - name: mysql-persistent-storage
         persistentVolumeClaim:
           claimName: mysql-pv-claim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sync
+  labels:
+    app: sync
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: sync
+  type: LoadBalancer
+---
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: sync
+  labels:
+    app: sync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sync
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: sync
+    spec:
+      containers:
+      - image: akril/sync:v1
+        name: sync
+        imagePullPolicy: Never
+        volumeMounts:
+        - name: from
+          mountPath: /app/from
+        - name: to
+          mountPath: /app/to
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/bash","-c","mkdir /app/to/app && mkdir /app/to/lib && cp -R /app/from/app/code /app/to/app && cp -R /app/from/app/design /app/to/app && cp -R /app/from/app/i18n /app/to/app && cp -R /app/from/lib/internal /app/to/lib && chmod -R 0777 /app/to"]	
+      volumes:
+      - name: from
+        hostPath:
+          path: /Users/akril/Dev/magento/instance/base/src/magento2ce
+      - name: to
+        hostPath:
+          path: /synced
