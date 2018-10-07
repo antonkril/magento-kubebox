@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: catalog
+  name: magento
   labels:
-    app: catalog
+    app: magento
 spec:
   ports:
     - port: 80
   selector:
-    app: catalog
+    app: magento
     tier: frontend
   type: LoadBalancer
 ---
@@ -26,54 +26,31 @@ spec:
     tier: frontend
   type: LoadBalancer
 ---
-apiVersion: v1
-kind: Service
-metadata:
-  name: admin
-  labels:
-    app: admin
-spec:
-  ports:
-    - port: 80
-  selector:
-    app: admin
-    tier: frontend
-  type: LoadBalancer
----
 apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
 kind: Deployment
 metadata:
-  name: catalog
+  name: magento
   labels:
-    app: catalog
+    app: magento
 spec:
-  replicas: 1 
+  replicas: 2 
   selector:
     matchLabels:
-      app: catalog
+      app: magento
       tier: frontend
-  strategy:
-    type: Recreate
   template:
     metadata:
       labels:
-        app: catalog
+        app: magento
         tier: frontend
     spec:
       containers:
-      - image: akril/magento-catalog:v1
-        name: catalog
+      - image: akril/magento:v1
+        name: magento
         ports:
         - containerPort: 80
-          name: catalog
-        volumeMounts:
-        - name: host-mount
-          mountPath: /app/src/magento2ce
+          name: magento
         imagePullPolicy: Never
-      volumes:
-      - name: host-mount
-        hostPath:
-          path: /synced
 ---
 apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
 kind: Deployment
@@ -101,90 +78,63 @@ spec:
         ports:
         - containerPort: 80
           name: checkout
-        volumeMounts:
-        - name: host-mount
-          mountPath: /app/src/magento2ce
         imagePullPolicy: Never
-      volumes:
-      - name: host-mount
-        hostPath:
-          path: /synced
----
-apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
-kind: Deployment
-metadata:
-  name: admin
-  labels:
-    app: admin
-spec:
-  replicas: 1 
-  selector:
-    matchLabels:
-      app: admin
-      tier: frontend
-  strategy:
-    type: Recreate
-  template:
-    metadata:
-      labels:
-        app: admin
-        tier: frontend
-    spec:
-      containers:
-      - image: akril/magento-admin:v1
-        name: admin
-        ports:
-        - containerPort: 80
-          name: admin
-        volumeMounts:
-        - name: host-mount
-          mountPath: /app/src/magento2ce
-        imagePullPolicy: Never
-      volumes:
-      - name: host-mount
-        hostPath:
-          path: /synced
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: mysql
+  name: magento-db
 spec:
   ports:
   - port: 3306
   selector:
-    app: mysql
+    app: magento-db
   clusterIP: None
+---
+kind: PersistentVolume
+apiVersion: v1
+metadata:
+  name: magento-db-pv
+  labels:
+    type: front
+spec:
+  capacity:
+    storage: 2Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/data/db"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: mysql-pv-claim
+  name: magento-db-pvc
 spec:
+  storageClassName: ""
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
+      storage: 2Gi
 ---
 apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
 kind: Deployment
 metadata:
-  name: mysql
+  name: magento-db
 spec:
   selector:
     matchLabels:
-      app: mysql
+      app: magento-db
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: mysql
+        app: magento-db
     spec:
       containers:
       - image: mysql:5.6
-        name: mysql
+        name: magento-db
         env:
           # Use secret in real usage
         - name: MYSQL_ROOT_PASSWORD
@@ -193,61 +143,9 @@ spec:
         - containerPort: 3306
           name: mysql
         volumeMounts:
-        - name: mysql-persistent-storage
+        - name: magento-db-persistent-storage
           mountPath: /var/lib/mysql
       volumes:
-      - name: mysql-persistent-storage
+      - name: magento-db-persistent-storage
         persistentVolumeClaim:
-          claimName: mysql-pv-claim
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: sync
-  labels:
-    app: sync
-spec:
-  ports:
-    - port: 80
-  selector:
-    app: sync
-  type: LoadBalancer
----
-apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
-kind: Deployment
-metadata:
-  name: sync
-  labels:
-    app: sync
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: sync
-  strategy:
-    type: Recreate
-  template:
-    metadata:
-      labels:
-        app: sync
-    spec:
-      containers:
-      - image: akril/sync:v1
-        name: sync
-        imagePullPolicy: Never
-        volumeMounts:
-        - name: from
-          mountPath: /app/from
-        - name: to
-          mountPath: /app/to
-        lifecycle:
-          postStart:
-            exec:
-              command: ["/bin/bash","-c","mkdir /app/to/app && mkdir /app/to/lib && cp -R /app/from/app/code /app/to/app && cp -R /app/from/app/design /app/to/app && cp -R /app/from/app/i18n /app/to/app && cp -R /app/from/lib/internal /app/to/lib && chmod -R 0777 /app/to"]	
-      volumes:
-      - name: from
-        hostPath:
-          path: /Users/akril/Dev/magento/instance/base/src/magento2ce
-      - name: to
-        hostPath:
-          path: /synced
+          claim: magento-db-pvc

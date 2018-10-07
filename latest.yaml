@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: latest
+  labels:
+    app: latest
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: latest
+  type: LoadBalancer
+---
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: latest
+  labels:
+    app: latest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: latest
+  template:
+    metadata:
+      labels:
+        app: latest
+    spec:
+      containers:
+      - image: akril/2.3.0
+        name: latest
+        ports:
+        - containerPort: 80
+          name: magento
+        imagePullPolicy: Never
