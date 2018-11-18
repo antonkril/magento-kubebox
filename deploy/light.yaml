@@ -1,0 +1,47 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: light
+  namespace: default
+  labels:
+    app: light
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: light
+  template:
+    metadata:
+      labels:
+        app: light
+    spec:
+      containers:
+      - name: light
+        imagePullPolicy: Never
+        image: akril/magento:v1
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: code
+          mountPath: /app/
+      volumes:
+      - name: code
+        persistentVolumeClaim:
+          claimName: sources-volume-claim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: light
+  namespace: default
+  labels:
+    app: light
+spec:
+  selector:
+    app: light
+  ports:
+  - name: app-port
+    port: 80
+    nodePort: 30101
+  type: NodePort

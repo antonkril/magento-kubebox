@@ -1,0 +1,49 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout
+  labels:
+    app: checkout
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: checkout
+    tier: frontend
+  type: LoadBalancer
+---
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: checkout
+  labels:
+    app: checkout
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: checkout
+      tier: frontend
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: checkout
+        tier: frontend
+    spec:
+      containers:
+      - image: akril/magento-checkout:v1
+        name: checkout
+        ports:
+        - containerPort: 80
+          name: checkout
+        imagePullPolicy: Never
+        volumeMounts:
+        - name: source
+          mountPath: /app/src/
+      volumes:
+      - name: source
+        persistentVolumeClaim:
+          claimName: source-pvc

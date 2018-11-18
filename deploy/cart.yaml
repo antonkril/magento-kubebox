@@ -1,0 +1,52 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cart
+  labels:
+    app: cart
+spec:
+  ports:
+    - port: 80
+  selector:
+    app: cart
+    tier: frontend
+  type: LoadBalancer
+---
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: cart
+  labels:
+    app: cart
+spec:
+  replicas: 1 
+  selector:
+    matchLabels:
+      app: cart
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: cart
+        tier: frontend
+    spec:
+      containers:
+      - image: akril/magento-base:v1
+        name: cart
+        ports:
+        - containerPort: 80
+          name: cart
+        imagePullPolicy: Never
+        volumeMounts:
+        - name: cart
+          mountPath: /app
+        - name: source
+          mountPath: /source/
+      volumes:
+      - name: cart
+        persistentVolumeClaim:
+          claimName: cart-pvc
+      - name: source
+        persistentVolumeClaim:
+          claimName: source-pvc

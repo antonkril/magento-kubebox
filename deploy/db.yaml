@@ -9,33 +9,6 @@ spec:
     app: magento-db
   clusterIP: None
 ---
-kind: PersistentVolume
-apiVersion: v1
-metadata:
-  name: magento-db-pv
-  labels:
-    type: front
-spec:
-  capacity:
-    storage: 2Gi
-  accessModes:
-    - ReadWriteOnce
-  hostPath:
-    path: "/data/db"
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: magento-db-pvc
-spec:
-  storageClassName: ""
-  volumeName: "magento-db-pv"
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 2Gi
----
 apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
 kind: Deployment
 metadata:
@@ -68,4 +41,3 @@ spec:
       - name: magento-db-persistent-storage
         persistentVolumeClaim:
           claimName: magento-db-pvc
-

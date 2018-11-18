@@ -1,36 +1,40 @@
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: latest
+  name: cart-compiled
   labels:
-    app: latest
+    app: cart-compiled
 spec:
   ports:
     - port: 80
   selector:
-    app: latest
+    app: cart-compiled
+    tier: frontend
   type: LoadBalancer
 ---
 apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
 kind: Deployment
 metadata:
-  name: latest
+  name: cart-compiled
   labels:
-    app: latest
+    app: cart-compiled
 spec:
-  replicas: 1
+  replicas: 1 
   selector:
     matchLabels:
-      app: latest
+      app: cart-compiled
+      tier: frontend
   template:
     metadata:
       labels:
-        app: latest
+        app: cart-compiled
+        tier: frontend
     spec:
       containers:
-      - image: akril/2.3.0
-        name: latest
+      - image: akril/cart-compiled:v1
+        name: cart-compiled
         ports:
         - containerPort: 80
-          name: magento
+          name: cart-compiled
         imagePullPolicy: Never
